@@ -1,0 +1,3 @@
+[
+  {"query_id": "Q1", "user_question": "What?", "expected_doc_ids": ["D999"], "risk_level": "low"}
+]

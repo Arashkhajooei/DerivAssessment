@@ -1,2 +1,14 @@
+# Local session state
 .remember/
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Secrets — never commit API keys
+.env

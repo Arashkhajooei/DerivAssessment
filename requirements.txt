@@ -1,0 +1,8 @@
+# Runtime dependencies, pinned for reproducibility.
+pydantic==2.12.5
+PyYAML==6.0.2
+
+# Optional: only needed for the `live` judge backend (real API calls).
+# The pipeline runs end to end without it via the `cache` and `stub`
+# backends, so it is intentionally not a hard requirement.
+# anthropic==0.40.0
