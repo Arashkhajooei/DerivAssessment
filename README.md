@@ -17,6 +17,7 @@ recommendation, the explainability view, the run manifest, the
 
 - [Quickstart](#quickstart)
 - [Dashboard (optional UI)](#dashboard-optional-ui)
+- [Running with Docker](#running-with-docker)
 - [Repository layout](#repository-layout)
 - [Artifacts reference](#artifacts-reference) — what's in each generated file
 - [How the recommendation is computed](#how-the-recommendation-is-computed) — the aggregation rule, plain English
@@ -61,54 +62,307 @@ see "Validation" below for exactly what it checks.
 
 ## Dashboard (optional UI)
 
-A local web dashboard for inspecting every stage and testing the harness
-from a tester's perspective, rather than reading eight files by hand.
+A local web dashboard that shows every pipeline stage on one screen and
+lets you run the harness without a terminal. It exists because the
+pipeline emits eight artifact files, and cross-referencing them by hand
+to answer "why did this variant lose?" is slow.
+
+**It is not part of the graded harness** — see [Scope and safety](#scope-and-safety).
+
+### Quick start
+
+From a clean checkout:
 
 ```bash
-uv pip install --python .venv/bin/python -r requirements-frontend.txt
+# 1. create a virtualenv (once)
+uv venv --python 3.12 .venv          # or: python3 -m venv .venv
 
-# from the repository root:
+# 2. install the harness + dashboard dependencies (once)
+uv pip install --python .venv/bin/python -r requirements-frontend.txt
+#    (this file includes requirements.txt, so it covers both)
+
+# 3. generate the artifacts the dashboard displays (once, or any time inputs change)
+.venv/bin/python run.py
+
+# 4. start the dashboard
 .venv/bin/uvicorn frontend.server:app --host 127.0.0.1 --port 5050
 ```
 
-Then open <http://127.0.0.1:5050>. Add `--reload` while editing the
-frontend if you want auto-restart on file changes. `python
-frontend/server.py` also works and is equivalent — it just calls
-`uvicorn.run()` with the same settings. Interactive API docs are at
-`/api/docs`.
+Then open **<http://127.0.0.1:5050>**.
 
-It gives you five views and three buttons:
-
-| View | Shows |
+| | |
 |---|---|
-| **Overview** | The promotion verdict, the reasons behind it, any tradeoffs, and the raw `recommendation.md` / `review_report.md` |
-| **Per-Query** | Per question: retrieved evidence with BM25 scores (expected docs badged), every variant's answer, pass/fail on each rule check, failure tags, and the judge's verdict + justification |
-| **Variants** | The comparison table — composite score, judge faithfulness/clarity, judge wins, failure-tag counts, with disqualified variants flagged in red |
-| **Logs & Provenance** | Every LLM call *attempt* (including failed ones) with backend, prompt hash, and errors; plus the full run manifest |
-| **Fixture** | Current inputs, a fixture upload form, and a restore-original button |
+| Alternative launch | `.venv/bin/python frontend/server.py` — equivalent, calls `uvicorn.run()` with the same settings |
+| Live reload while editing the UI | add `--reload` to the uvicorn command |
+| Different port | change `--port`; nothing is hardcoded to 5050 |
+| Interactive API docs | <http://127.0.0.1:5050/api/docs> (FastAPI's generated Swagger UI) |
+| Stop it | `Ctrl+C`, or `pkill -f "uvicorn frontend.server"` |
 
-**Run Pipeline** / **Validate** / **Run Tests** execute `run.py`,
-`validate.py`, and `pytest` as subprocesses and stream the output into a
-console panel with the exit code — so a tester never needs a terminal.
+**If you skip step 3**, the dashboard still loads but shows an empty
+state — click **Run Pipeline** in the header and it will generate
+everything for you.
 
-**Fixture swap from the browser.** Upload a replacement `kb.json` /
-`queries.json` / `candidate_answers.json` and the dashboard runs them
-through the harness's own `load_inputs` *before* overwriting anything.
-A fixture that fails schema or referential-integrity checks is rejected
-with the exact errors the pipeline would print, and the working fixture
-is left untouched. This was verified against a fixture with entirely
-different document ids (`KB-A`/`KB-B`), different query ids
-(`TICKET-77`/`TICKET-91`), and **three** variants
+**Enabling the live LLM judge from the dashboard.** The server passes its
+own environment to the subprocesses it launches, so export the key
+*before* starting it:
+
+```bash
+export OPENAI_API_KEY=...      # or ANTHROPIC_API_KEY, matching judge.provider
+.venv/bin/uvicorn frontend.server:app --host 127.0.0.1 --port 5050
+```
+
+Now **Run Pipeline** will make a real judge call (once — subsequent runs
+replay from cache). Without a key it falls back to `cache`, then `stub`,
+and the Overview badge shows which one served the run.
+
+### What the dashboard shows
+
+Everything comes from one `GET /api/state` call that returns the parsed
+contents of every artifact. Nothing is recomputed differently for
+display — the recommendation in particular is produced by importing the
+pipeline's own `compute_recommendation()`, so the dashboard cannot show a
+verdict the harness would not.
+
+#### Header (always visible)
+
+| Element | Data it carries |
+|---|---|
+| `original sample` / `custom fixture` badge | SHA-256 of the three current input files compared against a snapshot of the committed originals |
+| **Run Pipeline** button | runs `python run.py`; streams stdout/stderr + exit code into a console panel |
+| **Validate** button | runs `python validate.py` |
+| **Run Tests** button | runs `pytest` |
+
+#### Tab 1 — Overview
+
+| Element | Source |
+|---|---|
+| Selected variant (large, green) | `recommendation.selected_variant` |
+| `N queries × M variants` | counts from `queries.json` / `candidate_answers.json` |
+| **Judge badge** — `live` / `cache` / `stub` + `provider/model` | `run_manifest.json` → `judge.backend_used`. Orange for `stub`, so a rule-derived result is never mistaken for real model judgment |
+| "Why" bullet list | `recommendation.reasons` — the aggregation's own reasoning |
+| Tradeoffs block (when present) | `recommendation.tradeoffs` — fires when a disqualified variant beat the winner on judged clarity |
+| Collapsible raw files | full text of `recommendation.md` and `review_report.md` |
+
+#### Tab 2 — Per-Query
+
+One card per question, carrying every stage's output for that question:
+
+| Element | Source artifact |
+|---|---|
+| Query id + `risk_level` badge | `queries.json` |
+| The user question | `queries.json` |
+| **Retrieved evidence** — doc id, BM25 score, title, full text | `retrieval.json` |
+| Green `expected` badge on a passage | that doc id appears in the query's `expected_doc_ids` — i.e. retrieval found the right evidence |
+| Each variant's answer text | `candidate_answers.json` |
+| Check pills — `retrieval hit`, `must-include`, `no banned claim` / **`BANNED CLAIM`**, `grounding N` | `automated_scores.json` |
+| Failure tags | `failure_taxonomy.json` |
+| `check details` expander | the `notes` field — *which* phrase matched via *which* matching rung (`exact` / `subsequence` / `stemmed_subsequence`) |
+| `LLM judge — winner: X`, per-variant `faith`/`clarity`/`overclaim`, and the justification text | `llm_review.json` |
+
+This is the debugging view: when a variant loses, this tab shows why
+without opening a JSON file.
+
+#### Tab 3 — Variants
+
+The head-to-head comparison table. Columns are ordered to match the
+*decision* order, not score order:
+
+| Column | Source |
+|---|---|
+| `SAFETY GATE` — `passes` or `DISQUALIFIED` + the disqualifying queries | `recommendation.verdicts[].disqualified` / `.disqualifying_reasons` |
+| `COMPOSITE` | `recommendation.verdicts[].composite_score` |
+| `JUDGE FAITHFULNESS` / `JUDGE CLARITY` | mean across all queries, from `llm_review.json` |
+| `JUDGE WINS` | how many queries the judge picked that variant for |
+| `FAILURE TAGS` | tag counts aggregated from `failure_taxonomy.json` |
+
+A footnote states that the gate is a veto, so a reader cannot mistake the
+composite gap for the cause of the decision.
+
+#### Tab 4 — Logs & Provenance
+
+| Section | Data it carries |
+|---|---|
+| **LLM call log** — one row per attempt: backend, ok/failed, timestamp, model, truncated prompt hash, validation errors | every line of `llm_calls.jsonl`, including *failed* attempts |
+| Raw `llm_calls.jsonl` | collapsible, full text |
+| **Run provenance** — generated-at, git commit, config hash, judge model, judge backend used, Python version, and a SHA-256 per input file | `run_manifest.json` |
+
+The call log is where the caching design is visible: repeated runs on an
+unchanged fixture show one `live` row followed by `cache` rows sharing an
+identical prompt hash.
+
+#### Tab 5 — Fixture
+
+| Element | Data it carries |
+|---|---|
+| Current input counts — KB documents, queries, variants (listed by name) | read from the live input files, never hardcoded |
+| Collapsible viewers for `kb.json`, `queries.json`, `candidate_answers.json` | full file contents |
+| Three file pickers + **Upload & replace** | see below |
+| **Restore original sample** | copies the committed originals back over the current inputs |
+
+### Swapping fixtures from the browser
+
+Upload replacement `kb.json` / `queries.json` / `candidate_answers.json`,
+and the server validates all three with the harness's own `load_inputs()`
+**before** overwriting anything. A fixture that fails schema or
+referential-integrity checks is rejected with the exact errors the
+pipeline would print, and the working fixture is left untouched:
+
+```
+success: False
+ERROR: [ERROR] DANGLING_DOC_ID at queries.json[query_id=Q1].expected_doc_ids:
+       expected_doc_ids references unknown doc_id 'D_NOPE'
+```
+
+Because it reuses the pipeline's validator rather than a second copy of
+the rules, a file the pipeline would reject is a file the upload rejects,
+by construction.
+
+Once a valid fixture is uploaded, click **Run Pipeline** to evaluate it.
+This was verified end to end against a fixture with entirely different
+document ids, different query ids, and **three** variants
 (`baseline`/`concise_v2`/`risky_v3`): the pipeline correctly disqualified
 `risky_v3` for a banned claim on the high-risk query and promoted
 `baseline` on composite score — with no code changes.
 
-The dashboard is **not part of the graded harness**. Its dependencies
-live in `requirements-frontend.txt`; `run.py`, `validate.py`, and the
-test suite need none of them and behave identically whether or not it is
-ever started. It binds to loopback only and runs without auto-reload,
-because it executes local subprocesses on request — it is a developer
-tool, not something to expose beyond localhost.
+### The HTTP API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/` | the dashboard page |
+| `GET` | `/api/state` | every artifact, parsed, as one JSON payload |
+| `POST` | `/api/run` | run `run.py`, return stdout/stderr/exit code |
+| `POST` | `/api/validate` | run `validate.py` |
+| `POST` | `/api/test` | run `pytest` |
+| `POST` | `/api/upload-fixture` | multipart upload of `kb` / `queries` / `answers`; validated before write |
+| `POST` | `/api/restore-sample` | restore the committed sample inputs |
+
+### Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `Address already in use` | something else holds 5050 — use `--port 5051`, or `pkill -f "uvicorn frontend.server"` |
+| Dashboard loads but everything is empty | no artifacts yet — click **Run Pipeline**, or run `python run.py` |
+| Judge badge shows orange `stub` | no API key and no cached call for this fixture. Export a key and restart the server, or accept the rule-derived fallback |
+| Red banner with validation errors | the current input files are invalid — the exact errors are shown; fix them or click **Restore original sample** |
+| `ModuleNotFoundError: fastapi` | install the frontend extras: `uv pip install -r requirements-frontend.txt` |
+
+### Scope and safety
+
+The dashboard is **not part of the graded harness**. Its dependencies live
+in `requirements-frontend.txt`, and `run.py`, `validate.py` and the test
+suite import nothing from `frontend/` — they behave identically whether or
+not it is ever started.
+
+It binds to **loopback only** and runs without auto-reload by default,
+because it executes local subprocesses (`run.py`, `validate.py`, `pytest`)
+on request. Uploads are size-capped and validated before touching disk.
+It is a local developer tool and should not be exposed beyond localhost.
+
+## Running with Docker
+
+A `Dockerfile` and `docker-compose.yml` are included so the harness and
+its dashboard can be run without installing Python or any dependencies
+on the host.
+
+### One command
+
+```bash
+docker compose up --build
+```
+
+Then open **<http://127.0.0.1:5050>**.
+
+Or without compose:
+
+```bash
+docker build -t deriv-eval .
+docker run --rm -p 127.0.0.1:5050:5050 deriv-eval
+```
+
+### Running the pipeline, validator or tests instead
+
+The image's default command starts the dashboard, but any of the
+harness's entrypoints can be run directly:
+
+```bash
+docker run --rm deriv-eval python run.py          # regenerate all artifacts
+docker run --rm deriv-eval python validate.py     # check artifact consistency
+docker run --rm deriv-eval python -m pytest -q    # the test suite
+```
+
+With compose:
+
+```bash
+docker compose run --rm harness python run.py
+docker compose run --rm harness python validate.py
+docker compose run --rm harness python -m pytest -q
+```
+
+### What the image contains
+
+| | |
+|---|---|
+| Base | `python:3.12-slim` |
+| Dependencies | harness + dashboard + dev + the optional LLM SDK, so live judging works if a key is supplied |
+| Runs as | non-root (`appuser`, uid 10001) |
+| Artifacts | generated at **build time** via `RUN python run.py`, so the dashboard has results the moment the container starts |
+| Judge cache | `llm_calls.jsonl` is copied in, so the container reproduces the **real** recorded LLM verdicts offline, with no API key and no network |
+
+That last point is worth noting: a fresh `docker run` with no
+configuration at all shows genuine model judgments, not the deterministic
+stub, because the cached call travels with the image.
+
+### Enabling the live LLM judge
+
+Pass a key through as an environment variable:
+
+```bash
+docker run --rm -p 127.0.0.1:5050:5050 \
+  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+  deriv-eval
+```
+
+Or uncomment the matching line under `environment:` in
+`docker-compose.yml` and run `docker compose up`.
+
+Without a key the judge replays the baked-in cache, and falls back to the
+deterministic stub if the fixture has changed. The pipeline completes
+either way, and the Overview badge always shows which backend served the
+run.
+
+### Getting artifacts onto the host
+
+The container is self-contained by default. To retrieve generated files:
+
+```bash
+docker compose cp harness:/app/recommendation.md .
+```
+
+Or use the `dev` service, which bind-mounts your working copy so the
+container runs your local code and writes artifacts straight back into
+the checkout:
+
+```bash
+docker compose --profile dev up dev      # dashboard on http://127.0.0.1:5051
+```
+
+### A note on network binding
+
+Inside the container the server binds `0.0.0.0`, which is required for
+Docker port publishing to reach the process at all — `127.0.0.1` inside a
+container is only reachable from inside it. Exposure is restricted on the
+**host** side instead, via `-p 127.0.0.1:5050:5050`, so the dashboard is
+not reachable from other machines on your network.
+
+### Build verification status
+
+The Dockerfile and compose file have **not been built on this machine** —
+no container runtime was available in the development environment. What
+*was* verified: a directory containing exactly the files the Dockerfile
+copies was assembled, and `python run.py`, `python validate.py`,
+`python -m pytest -q` and importing `frontend.server:app` all succeed
+inside it. That confirms the `COPY` set is complete and the commands are
+correct; it does not substitute for an actual `docker build`.
 
 ## Repository layout
 
@@ -473,13 +727,15 @@ of these choices rather than the choices themselves.
 
 Roughly in the order I'd tackle them:
 
-1. **Actually exercise the live judge backend against the real Anthropic
-   API.** Everything downstream of "a response came back" is unit-tested
-   against a mocked call (10 tests in `test_judge.py`), but the live path
-   itself has never made a real request in this environment — no key was
-   available. I'd add a small integration test that runs only when
-   `ANTHROPIC_API_KEY` is set (skipped otherwise) so the real path gets
-   continuous coverage the moment a key exists.
+1. **A key-gated integration test for the live judge.** The live path has
+   now been exercised for real against `openai/gpt-4o-mini` (see
+   [Verified against the live OpenAI API](#verified-against-the-live-openai-api)),
+   and everything downstream of "a response came back" is unit-tested
+   against a mocked call. What's missing is *continuous* coverage: a test
+   that runs only when an API key is present in the environment and is
+   skipped otherwise, so the real request path stays covered on any
+   machine that has a key rather than being verified once by hand. The
+   Anthropic backend in particular is still only mock-tested.
 2. **A negation-aware check to close the lexical ladder's most-cited
    gap.** The matcher can register a hedged or explicitly negated mention
    of a banned phrase as a violation. A small local NLI model or a

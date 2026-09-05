@@ -1,0 +1,47 @@
+# One-command start for the dashboard:
+#
+#   docker compose up --build
+#
+# Then open http://127.0.0.1:5050
+#
+# To run the pipeline, validator or tests instead of the dashboard:
+#   docker compose run --rm harness python run.py
+#   docker compose run --rm harness python validate.py
+#   docker compose run --rm harness python -m pytest -q
+#
+# To get the generated artifacts onto the host, either copy them out:
+#   docker compose cp harness:/app/recommendation.md .
+# or use the `dev` service below, which bind-mounts your working copy so
+# the container reads your code and writes artifacts straight back to it.
+
+services:
+  harness:
+    build: .
+    image: deriv-eval
+    ports:
+      # Published to loopback only. The process binds 0.0.0.0 inside the
+      # container (required for publishing to work at all), so exposure is
+      # restricted here on the host side instead.
+      - "127.0.0.1:5050:5050"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Optional: pass a key through from your shell to enable the live
+      # LLM judge. Without one the judge replays the image's baked-in
+      # cache, then falls back to the deterministic stub -- the pipeline
+      # completes either way.
+      # - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+  # Same image, but your working copy is mounted over /app: the container
+  # runs your local code and its artifacts land in your checkout. Start it
+  # with `docker compose --profile dev up dev`.
+  dev:
+    build: .
+    image: deriv-eval
+    profiles: ["dev"]
+    ports:
+      - "127.0.0.1:5051:5050"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
