@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-09-05T09:27:08.644897+00:00",
+  "git_commit": "2adefd4d82937891212cfcadefee27c8f35f027a",
+  "config_hash": "d4f9d311b4d6c68d8c6053b411f299d311d7d01b1498b50ca8ee5befd826e073",
+  "input_hashes": {
+    "kb.json": "cb7c823789e4cfe19fc56556add60a103374d4f62071992b0cc453f40661f59d",
+    "queries.json": "fde8a2da17844ef10dbd1315ea256df62519a93b775eecac8d59028fc9ccd1ce",
+    "candidate_answers.json": "4133370f1c84fc2974359fb4e456642589b5412aa8fde7d5b4f3f9e4dfc1a034"
+  },
+  "python_version": "3.12.13",
+  "judge": {
+    "model": "claude-sonnet-5",
+    "backend_order": [
+      "cache",
+      "live",
+      "stub"
+    ],
+    "backend_used": "stub"
+  },
+  "counts": {
+    "kb_docs": 5,
+    "queries": 4,
+    "variants": 2
+  },
+  "stage_timings_seconds": {
+    "retrieval": 0.0004,
+    "automated_scores": 0.0006,
+    "llm_review": 0.0005,
+    "failure_taxonomy": 0.0001,
+    "recommendation": 0.0001,
+    "review_report": 0.0001
+  }
+}

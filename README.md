@@ -7,29 +7,42 @@ code-based checks and one controlled LLM judgment stage, detects safety and
 grounding failures, and produces a promotion recommendation with stated
 reasoning — not just a leaderboard.
 
-This README documents the full design and will be extended as each stage
-of the pipeline is built. **Status: retrieval, rule-based scoring, the LLM
-review stage, failure taxonomy, and aggregation/recommendation are all
-implemented and wired into `run.py`.** Remaining: the `validate.py`
-artifact-consistency checker, the run manifest / provenance metadata, and
-the `review_report.md` explainability view (a stretch goal).
+**Status: complete.** All ten build steps are implemented: deterministic
+retrieval, rule-based scoring, the one controlled LLM review stage
+(cache/live/stub), the failure taxonomy, safety-gated aggregation and
+recommendation, the explainability view, the run manifest, the
+`validate.py` consistency checker, and the test suite (65 tests).
 
-## Quickstart (current state)
+## Quickstart
 
 ```bash
 uv venv --python 3.12 .venv        # or: python3 -m venv .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
-.venv/bin/python -m pytest -q
-.venv/bin/python run.py
+.venv/bin/python -m pytest -q      # 65 tests
+.venv/bin/python run.py            # regenerate every artifact
+.venv/bin/python validate.py       # check the artifacts are complete and consistent
+```
+
+Or, with `make`:
+
+```bash
+make install
+make test
+make run
+make validate
 ```
 
 The harness targets **Python 3.9+** for compatibility with older system
-interpreters; it has been developed and tested on 3.12.
+interpreters (verified with `py_compile` against the system 3.9
+interpreter); it has been developed and tested on 3.12.
 
-`python run.py` regenerates every implemented artifact:
-`retrieval.json`, `automated_scores.json`, `llm_review.json`,
-`llm_calls.jsonl`, `failure_taxonomy.json`, and `recommendation.md`.
-`validate.py` is not implemented yet.
+`run.py` regenerates every artifact: `retrieval.json`,
+`automated_scores.json`, `llm_review.json`, `llm_calls.jsonl`,
+`failure_taxonomy.json`, `recommendation.md`, `review_report.md`, and
+`run_manifest.json`. `validate.py` checks that a completed run's
+artifacts are present, well-formed, internally consistent, and that
+`recommendation.md` is reproducible from the stored artifacts alone —
+see "Validation" below for exactly what it checks.
 
 ## Repository layout
 
@@ -64,17 +77,34 @@ evalharness/                 the library
                               already-computed scores + judge output
   aggregate.py                  safety-gated aggregation and the
                               recommendation.md renderer
+  review_report.py            the per-query explainability view renderer
+  manifest.py                  run manifest: git SHA, config hash, input
+                              hashes, judge backend used, stage timings
 
-run.py                       orchestrates all five implemented stages
+run.py                       orchestrates all eight stages, writes every
+                              artifact plus run_manifest.json
+validate.py                   checks a completed run's artifacts for
+                              presence, well-formedness, internal
+                              consistency, and recommendation reproducibility
 
 tests/
   test_loader.py              validation behaviour, incl. adversarial fixtures
   test_schemas.py              direct Pydantic model tests
+  test_matching.py              the phrase-matching ladder, incl. every
+                              near-miss case from the sample data and the
+                              one case correctly out of lexical scope
+  test_checks.py                grounding_score behavior: precision, quote
+                              bonus, numeric penalty, empty constraints
   test_judge.py                 schema validation + backend resolution
                               (cache/live/stub), live backend mocked
   test_taxonomy.py              each failure tag's derivation rule
   test_aggregate.py             safety gate, tradeoff surfacing, k-variant
                               support, no-clear-winner cases
+  test_determinism.py           repeated runs produce byte-identical
+                              retrieval + scoring output
+  test_pipeline_fixture_swap.py  the full pipeline (not just loading) run
+                              end-to-end against a synthetic 3-variant,
+                              empty-constraint fixture
   fixtures/broken/             hand-built fixtures, each violating exactly
                                 one rule, plus one fixture that must succeed
                                 (3 variants, unconventional names, empty
@@ -84,8 +114,41 @@ tests/
 
 Generated artifacts (`retrieval.json`, `automated_scores.json`,
 `llm_review.json`, `llm_calls.jsonl`, `failure_taxonomy.json`,
-`recommendation.md`) are written to the repository root by `run.py`,
-matching the exact filenames the spec requires.
+`recommendation.md`, `review_report.md`, `run_manifest.json`) are written
+to the repository root by `run.py`, matching the exact filenames the spec
+requires.
+
+## Validation
+
+`python validate.py` (or `make validate`) checks a completed run without
+needing to re-run the pipeline:
+
+1. every required artifact exists and is syntactically valid JSON/JSONL
+   (Markdown files are checked for non-empty content)
+2. every artifact's records conform to their Pydantic schema
+3. every `(query_id, variant)` pair present in `candidate_answers.json`
+   has a corresponding `automated_scores.json` record
+4. `retrieval.json` contains exactly `config.retrieval.top_k` passages
+   per query (or fewer only if the knowledge base itself has fewer
+   documents than that)
+5. every `llm_review.json` record uses only real variant names and
+   in-range scores — this reuses the exact same `validate_reviews()`
+   function the judge stage applies to a live API response, so there is
+   one source of truth for "a valid review," not two implementations
+   that could drift apart
+6. `recommendation.md` is **recomputed from the stored artifacts**
+   (`automated_scores.json`, `llm_review.json`, `failure_taxonomy.json`,
+   plus the judge backend recorded in `run_manifest.json`) and diffed
+   byte-for-byte against what's on disk — if a fixture or config changed
+   since the last `run.py`, this fails loudly rather than silently
+   serving a stale recommendation
+
+Exit code 0 means every check passed; exit code 1 means at least one
+failed, with every failure printed (not just the first). This was
+verified by deliberately corrupting each of a stale `recommendation.md`,
+a truncated `automated_scores.json`, and an invalid `winner` in
+`llm_review.json` — each was caught with a specific, correct error
+message, then the artifacts were restored.
 
 ## Design principles this repo follows
 
@@ -180,7 +243,15 @@ requires a key, which this environment does not have.
   shares few tokens with its answer passage (pure paraphrase). This
   harness has no embedding-based fallback by design (external calls for
   retrieval are disallowed by the brief).
-- The aggregation/recommendation logic (`evalharness/aggregate.py`) is
-  covered by unit tests on synthetic fixtures, but has not yet been
-  reviewed end-to-end against a large, adversarial swapped fixture beyond
-  the ones in `tests/fixtures/broken/`.
+- The composite score's weights (`config.yaml: aggregation.weights`) are
+  a stated, documented modeling choice, not a discovered optimum. They
+  are designed to be easy to audit and change, not to be treated as the
+  one correct weighting — this is also called out live in every
+  generated `recommendation.md`.
+- With only 4 queries in the shipped sample fixture, any composite margin
+  computed against it has limited statistical power; `recommendation.md`
+  says so explicitly. A larger fixture would give the margin more
+  meaning, but the harness itself places no lower bound on query count.
+- `run_manifest.json`'s `git_commit` field is best-effort: outside a git
+  checkout, or if the `git` binary is unavailable, it is recorded as
+  `null` rather than failing the run.
