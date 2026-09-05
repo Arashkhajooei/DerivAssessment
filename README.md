@@ -7,11 +7,15 @@ code-based checks and one controlled LLM judgment stage, detects safety and
 grounding failures, and produces a promotion recommendation with stated
 reasoning — not just a leaderboard.
 
+> **The original task brief, reproduced in full with a requirement-by-requirement
+> coverage map, is in [TASK.md](TASK.md).** This README documents what was
+> built; TASK.md is the specification it was built against.
+
 **Status: complete.** All ten build steps are implemented: deterministic
 retrieval, rule-based scoring, the one controlled LLM review stage
 (cache/live/stub), the failure taxonomy, safety-gated aggregation and
 recommendation, the explainability view, the run manifest, the
-`validate.py` consistency checker, and the test suite (65 tests).
+`validate.py` consistency checker, and the test suite (86 tests).
 
 ## Contents
 
@@ -34,7 +38,7 @@ recommendation, the explainability view, the run manifest, the
 ```bash
 uv venv --python 3.12 .venv        # or: python3 -m venv .venv
 uv pip install --python .venv/bin/python -r requirements-dev.txt
-.venv/bin/python -m pytest -q      # 65 tests
+.venv/bin/python -m pytest -q      # 86 tests
 .venv/bin/python run.py            # regenerate every artifact
 .venv/bin/python validate.py       # check the artifacts are complete and consistent
 ```
@@ -438,6 +442,11 @@ tests/
   test_pipeline_fixture_swap.py  the full pipeline (not just loading) run
                               end-to-end against a synthetic 3-variant,
                               empty-constraint fixture
+  test_frontend.py              the dashboard's endpoints via FastAPI's
+                              TestClient -- state payload shape, command
+                              wrappers, and that an invalid fixture upload
+                              is rejected without touching the real files.
+                              Skipped when the dashboard extras are absent
   fixtures/broken/             hand-built fixtures, each violating exactly
                                 one rule, plus one fixture that must succeed
                                 (3 variants, unconventional names, empty

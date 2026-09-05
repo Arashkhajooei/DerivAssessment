@@ -6,3 +6,8 @@ fastapi==0.115.6
 uvicorn==0.34.0
 # Required by FastAPI to parse multipart/form-data (the fixture upload).
 python-multipart==0.0.20
+
+# Required by fastapi.testclient.TestClient, which tests/test_frontend.py
+# uses. FastAPI only pulls httpx in via an optional extra, so declare it
+# here -- otherwise the dashboard tests silently skip on a fresh install.
+httpx==0.28.1

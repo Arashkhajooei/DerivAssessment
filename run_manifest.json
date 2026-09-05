@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-05T22:23:46.132461+00:00",
-  "git_commit": "2b55dcf33257ef5b43b9a4529a60299e2e4cbc40",
+  "generated_at": "2026-09-05T22:57:57.042461+00:00",
+  "git_commit": "b228de1882e78c2acf4b3e790dfc650964663285",
   "config_hash": "e52e12b11456bfc69cc2eca2ad3dbae8fd23ca74a3ab785653c88de9348c245d",
   "input_hashes": {
     "kb.json": "cb7c823789e4cfe19fc56556add60a103374d4f62071992b0cc453f40661f59d",
@@ -24,10 +24,10 @@
     "variants": 2
   },
   "stage_timings_seconds": {
-    "retrieval": 0.0004,
+    "retrieval": 0.0006,
     "automated_scores": 0.0008,
-    "llm_review": 0.0004,
-    "failure_taxonomy": 0.0001,
+    "llm_review": 0.0006,
+    "failure_taxonomy": 0.0002,
     "recommendation": 0.0001,
     "review_report": 0.0001
   }
