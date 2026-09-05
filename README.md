@@ -240,37 +240,72 @@ The judge stage resolves through three backends, in this order (see
 `judge.backend_order` in `config.yaml`):
 
 1. **cache** — replays a previously logged live call from `llm_calls.jsonl`
-   by exact content hash (model + params + prompt + rubric version). Zero
-   cost, fully offline, byte-identical output.
-2. **live** — a real call to the Anthropic API, temperature 0, structured
-   output enforced via tool use, validated in code before use.
+   by exact content hash (provider + model + params + prompt + rubric
+   version). Zero cost, fully offline, byte-identical output.
+2. **live** — a real API call to the configured provider, temperature 0,
+   structured output enforced via that provider's forced tool call, then
+   re-validated in code before use.
 3. **stub** — a deterministic, rule-derived judgment (no network, no
    model) used when no key is configured or the live call fails. The
-   pipeline always completes; `llm_calls.jsonl` and `recommendation.md`
-   both record which backend actually served each run so this is never
-   silently mistaken for a real model judgment.
+   pipeline always completes; `llm_calls.jsonl`, `run_manifest.json`,
+   `recommendation.md`, and the dashboard all record which backend
+   actually served each run, so a stub result is never silently mistaken
+   for a real model judgment.
 
-To use your own key:
+**Two providers are supported**, selected by `judge.provider` in
+`config.yaml` (`openai` or `anthropic`). Adding another is one function
+plus one registry entry in `evalharness/judge.py` — nothing else changes.
 
 ```bash
+# OpenAI (the default in config.yaml)
+pip install -r requirements-llm.txt
+export OPENAI_API_KEY=...
+python run.py
+
+# Anthropic: set judge.provider: anthropic and judge.model in config.yaml
 pip install anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=...
 python run.py
 ```
 
-The first run makes one real API call (covering every query/answer pair)
+The first run makes one real API call covering every query/answer pair
 and appends it to `llm_calls.jsonl`. Every subsequent run replays that
 exact call from cache — free, offline, deterministic — until the inputs,
-config, or prompt change, at which point the content hash changes and a
-fresh live call is made.
+config, prompt, provider, or model change, at which point the content
+hash changes and a fresh live call is made.
 
-**This repository was built and committed without an API key available.**
-The live backend's request/response handling and structured-output
-validation are implemented and unit-testable against a mocked API
-response, but the live path itself has not been exercised against the
-real Anthropic API in this environment. `llm_calls.jsonl` in this repo
-therefore contains only `stub` entries. Testing the live path end-to-end
-requires a key, which this environment does not have.
+Both providers use **forced function/tool calling** rather than a strict
+JSON-schema response format. The review payload keys its per-variant
+score maps by variant *name* — which is data, not schema — and strict
+schema modes disallow the open-ended `additionalProperties` that
+requires.
+
+### Verified against the live OpenAI API
+
+The live path has been exercised end to end against
+`openai/gpt-4o-mini` (1,353 input / 419 output tokens for the full
+4-query batch). Two things that verified:
+
+- **Cache replay is real.** A second run with `OPENAI_API_KEY` unset
+  resolved to the `cache` backend and produced byte-identical
+  `llm_review.json` output. That is the whole "replayable pipeline with a
+  genuine LLM stage" claim, demonstrated rather than asserted.
+- **The judge closed the gap the lexical layer cannot.** Q4's banned
+  claim (`"yes, after verification"`) shares almost no tokens with
+  `prompt_b`'s *"You may be able to withdraw after your demo account is
+  upgraded and verified"*, so the deterministic matcher correctly does
+  not fire on it. The live judge caught it anyway — flagging
+  `overclaim_flags: {prompt_b: true}` with the reasoning *"introduces
+  uncertainty by suggesting that withdrawals may be possible after
+  upgrading, which is not supported by the evidence."* That is precisely
+  the division of labour this harness is built around: cheap
+  deterministic checks handle lexical drift, and the one LLM stage is
+  reserved for the semantic judgment code genuinely cannot make.
+
+`llm_calls.jsonl` in this repo therefore contains a real `live` entry
+plus its `cache` replay. **No API key is stored in this repository** —
+keys are read from the environment only, and never written to any
+artifact, config file, or log.
 
 ## Validation
 
@@ -414,8 +449,9 @@ of these choices rather than the choices themselves.
 - The stub judge backend derives `winner`/`faithfulness`/`overclaim_flags`
   from the same deterministic signals already in `automated_scores.json`;
   it adds no independent judgment. `clarity` under the stub is a constant
-  placeholder, not a real assessment — genuinely evaluating prose clarity
-  requires the live LLM backend.
+  placeholder, not a real assessment. This is why the backend actually
+  used is surfaced everywhere the results are — a stub run is a valid
+  fallback, not an equivalent substitute for the live judge.
 - BM25 retrieval, like any lexical retriever, is weakest on a query that
   shares few tokens with its answer passage (pure paraphrase). This
   harness has no embedding-based fallback by design (external calls for

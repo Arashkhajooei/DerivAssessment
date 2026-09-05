@@ -82,8 +82,12 @@ aggregation:
   score_precision: 4
 
 judge:
-  provider: anthropic
-  model: claude-sonnet-5
+  # Which live-backend provider to call. Supported: anthropic, openai.
+  # The provider is part of the LLM cache key, so switching it correctly
+  # invalidates cached calls rather than replaying another provider's
+  # answer.
+  provider: openai
+  model: gpt-4o-mini
   temperature: 0
   max_tokens: 4096
   # Allowed integer range for faithfulness and clarity scores.

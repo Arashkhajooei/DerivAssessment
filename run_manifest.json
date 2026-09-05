@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-05T16:36:42.984215+00:00",
-  "git_commit": "d19bf3929d8afb7eb5db73bb77fc0ad7f0f0d4c1",
-  "config_hash": "d4f9d311b4d6c68d8c6053b411f299d311d7d01b1498b50ca8ee5befd826e073",
+  "generated_at": "2026-09-05T16:52:24.341396+00:00",
+  "git_commit": "c01d16b39265b2ed93673ef378098741503aaa0f",
+  "config_hash": "e52e12b11456bfc69cc2eca2ad3dbae8fd23ca74a3ab785653c88de9348c245d",
   "input_hashes": {
     "kb.json": "cb7c823789e4cfe19fc56556add60a103374d4f62071992b0cc453f40661f59d",
     "queries.json": "fde8a2da17844ef10dbd1315ea256df62519a93b775eecac8d59028fc9ccd1ce",
@@ -9,13 +9,14 @@
   },
   "python_version": "3.12.13",
   "judge": {
-    "model": "claude-sonnet-5",
+    "provider": "openai",
+    "model": "gpt-4o-mini",
     "backend_order": [
       "cache",
       "live",
       "stub"
     ],
-    "backend_used": "stub"
+    "backend_used": "cache"
   },
   "counts": {
     "kb_docs": 5,
@@ -24,7 +25,7 @@
   },
   "stage_timings_seconds": {
     "retrieval": 0.0003,
-    "automated_scores": 0.0007,
+    "automated_scores": 0.0006,
     "llm_review": 0.0005,
     "failure_taxonomy": 0.0001,
     "recommendation": 0.0001,

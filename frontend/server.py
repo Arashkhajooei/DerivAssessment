@@ -193,6 +193,7 @@ def api_state() -> Dict[str, Any]:
         "kb": None,
         "queries": None,
         "answers": None,
+        "judge_config": None,
         "manifest": None,
         "retrieval": None,
         "automated_scores": None,
@@ -232,6 +233,11 @@ def api_state() -> Dict[str, Any]:
     state["queries"] = [q.model_dump() for q in inputs.queries]
     state["answers"] = {a.query_id: a.answers for a in inputs.answers}
 
+    state["judge_config"] = {
+        "provider": config["judge"].get("provider"),
+        "model": config["judge"].get("model"),
+        "backend_order": config["judge"].get("backend_order"),
+    }
     state["manifest"] = _read_json(paths["run_manifest"])
     state["retrieval"] = _read_json(paths["retrieval"])
     state["automated_scores"] = _read_json(paths["automated_scores"])

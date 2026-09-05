@@ -183,3 +183,47 @@ class TestBackendResolution:
         # max_retries=1 in config.yaml -> 2 live attempts total, both invalid.
         assert len(live_attempts) == config["judge"]["max_retries"] + 1
         assert all(not e["parsed_ok"] for e in live_attempts)
+
+
+class TestProviderDispatch:
+    """The live backend dispatches on `judge.provider`. These tests cover
+    the dispatch and cache-key behaviour without making any network call.
+    """
+
+    def test_unknown_provider_is_unavailable_not_a_crash(self, config):
+        # An unrecognised provider must fall through to the next backend
+        # (raising LiveBackendUnavailable), never take down the pipeline.
+        config["judge"]["provider"] = "not_a_real_provider"
+        with pytest.raises(judge.LiveBackendUnavailable) as exc_info:
+            judge.call_live("system", "user", config)
+        assert "unknown judge provider" in str(exc_info.value)
+
+    def test_missing_openai_key_is_unavailable(self, config, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        config["judge"]["provider"] = "openai"
+        with pytest.raises(judge.LiveBackendUnavailable) as exc_info:
+            judge.call_live("system", "user", config)
+        assert "OPENAI_API_KEY" in str(exc_info.value)
+
+    def test_missing_anthropic_key_is_unavailable(self, config, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        config["judge"]["provider"] = "anthropic"
+        with pytest.raises(judge.LiveBackendUnavailable) as exc_info:
+            judge.call_live("system", "user", config)
+        # Either the SDK is absent or the key is -- both are "unavailable",
+        # which is the behaviour that matters here.
+        assert "not installed" in str(exc_info.value) or "ANTHROPIC_API_KEY" in str(exc_info.value)
+
+    def test_provider_is_part_of_the_cache_key(self):
+        # Two providers can expose the same model name; a cached answer
+        # from one must never be replayed as the other's.
+        args = ("gpt-4o-mini", 0, 4096, "identical prompt")
+        assert judge.compute_prompt_hash("openai", *args) != judge.compute_prompt_hash("anthropic", *args)
+
+    def test_same_inputs_hash_identically(self):
+        args = ("openai", "gpt-4o-mini", 0, 4096, "identical prompt")
+        assert judge.compute_prompt_hash(*args) == judge.compute_prompt_hash(*args)
+
+    def test_prompt_change_changes_the_hash(self):
+        base = ("openai", "gpt-4o-mini", 0, 4096)
+        assert judge.compute_prompt_hash(*base, "prompt one") != judge.compute_prompt_hash(*base, "prompt two")

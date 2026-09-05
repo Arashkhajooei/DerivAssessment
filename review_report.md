@@ -72,7 +72,7 @@ Overall selected variant for promotion: **prompt_a**
 
 **prompt_b:** "You may be able to withdraw after your demo account is upgraded and verified."
   - grounding_score=0.2429, failed checks: must_include_pass
-  - failure tags: missed_key_fact
+  - failure tags: unsupported_claim, missed_key_fact
 
 **Judge winner for this question:** prompt_a
 

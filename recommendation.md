@@ -11,8 +11,8 @@
 
 | Variant | Disqualified | Composite score | Mean judge faithfulness | Mean judge clarity | Judge wins | Failure tags |
 |---|---|---|---|---|---|---|
-| `prompt_a` | no | 0.9176 | 4.5 | 3.0 | 4 | none |
-| `prompt_b` | yes -- Q2: banned claim on a high-risk query; Q3: banned claim on a high-risk query | 0.3503 | 2.25 | 3.0 | 0 | missed_key_fact=3, overconfident_tone=1, policy_violation=2, unsupported_claim=3 |
+| `prompt_a` | no | 0.9614 | 5.0 | 5.0 | 4 | none |
+| `prompt_b` | yes -- Q2: banned claim on a high-risk query; Q3: banned claim on a high-risk query | 0.3004 | 1.25 | 2.0 | 0 | missed_key_fact=3, overconfident_tone=1, policy_violation=2, unsupported_claim=4 |
 
 ## Per-query detail
 
@@ -29,8 +29,7 @@
 
 ## Known limitations of this evaluation harness
 
-- Judge backend used for this run: **stub**.
-  No live LLM backend was available (no API key / package configured), so the faithfulness, clarity, and winner values above were derived deterministically from the rule-based checks, not independently judged. See README for how to enable the live backend with your own API key.
+- Judge backend used for this run: **cache**.
 - `must_not_claim` / `must_include_any` matching is lexical (exact -> ordered subsequence -> stemmed subsequence), not negation-aware; a hedged or explicitly negated mention of a banned phrase can register as a match.
 - `grounding_score` is a token-overlap-plus-heuristics proxy for faithfulness, not a semantic entailment check.
 - The composite score's weights (`config.yaml: aggregation.weights`) are a stated modeling choice, not a discovered optimum -- they are designed to be easy to audit and change, not to be treated as the one correct weighting.

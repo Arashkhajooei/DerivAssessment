@@ -15,8 +15,9 @@ config.yaml:
            hash (model + params + prompt + rubric version). Zero cost,
            fully offline, byte-identical output -- this is what makes a
            genuine LLM integration compatible with a "replayable" pipeline.
-    live   a real Anthropic API call. Structured output is enforced via
-           tool use (forced tool choice) and then re-validated in code
+    live   a real API call to the configured provider (`judge.provider`:
+           anthropic or openai). Structured output is enforced via that
+           provider's forced tool call, then re-validated in code
            (range checks, exact variant-key-set checks) before use --
            belt and suspenders, since a JSON-schema-conformant response can
            still contain an out-of-range score or an unknown variant name.
@@ -198,26 +199,29 @@ def build_batch_prompt(
     return "\n\n---\n\n".join(blocks)
 
 
-def compute_prompt_hash(model: str, temperature: float, max_tokens: int, prompt: str) -> str:
-    """Content-address the exact call this batch represents. If the model,
-    sampling params, rubric version, or prompt text change in any way, the
-    hash changes and the cache correctly treats it as a new call rather
-    than incorrectly replaying a stale one.
+def compute_prompt_hash(
+    provider: str, model: str, temperature: float, max_tokens: int, prompt: str
+) -> str:
+    """Content-address the exact call this batch represents. If the
+    provider, model, sampling params, rubric version, or prompt text
+    change in any way, the hash changes and the cache correctly treats it
+    as a new call rather than incorrectly replaying a stale one.
+
+    The provider is part of the key because two providers can expose the
+    same model name, and a cached Anthropic answer must never be replayed
+    as though it came from OpenAI.
     """
-    canonical = "model={}|temperature={}|max_tokens={}|rubric={}|prompt={}".format(
-        model, temperature, max_tokens, RUBRIC_VERSION, prompt
+    canonical = "provider={}|model={}|temperature={}|max_tokens={}|rubric={}|prompt={}".format(
+        provider, model, temperature, max_tokens, RUBRIC_VERSION, prompt
     )
     return sha256_text(canonical)
 
 
-def call_live(system_prompt: str, user_prompt: str, config: dict) -> Tuple[str, int, Optional[dict]]:
-    """One real call to the Anthropic API with structured output enforced
-    via forced tool use. Returns (raw_json_text, latency_ms, usage_dict).
-
-    Raises LiveBackendUnavailable if the optional `anthropic` package is
-    not installed or no API key is configured (caller should fall through
-    to the next backend without spending a retry). Raises LiveBackendError
-    if a call was attempted but failed or returned an unusable shape.
+def _call_anthropic(
+    system_prompt: str, user_prompt: str, judge_cfg: dict
+) -> Tuple[str, int, Optional[dict]]:
+    """Anthropic Messages API with structured output enforced via forced
+    tool use.
     """
     try:
         import anthropic
@@ -228,9 +232,7 @@ def call_live(system_prompt: str, user_prompt: str, config: dict) -> Tuple[str, 
     if not api_key:
         raise LiveBackendUnavailable("ANTHROPIC_API_KEY is not set")
 
-    judge_cfg = config["judge"]
     client = anthropic.Anthropic(api_key=api_key)
-
     start = time.monotonic()
     try:
         response = client.messages.create(
@@ -239,7 +241,7 @@ def call_live(system_prompt: str, user_prompt: str, config: dict) -> Tuple[str, 
             temperature=judge_cfg["temperature"],
             system=system_prompt,
             tools=[REVIEW_TOOL_SCHEMA],
-            tool_choice={"type": "tool", "name": "submit_review"},
+            tool_choice={"type": "tool", "name": REVIEW_TOOL_SCHEMA["name"]},
             messages=[{"role": "user", "content": user_prompt}],
         )
     except Exception as exc:  # noqa: BLE001 -- any SDK/network/auth failure
@@ -250,15 +252,116 @@ def call_live(system_prompt: str, user_prompt: str, config: dict) -> Tuple[str, 
     if not tool_blocks:
         raise LiveBackendError("model response did not include a tool_use block")
 
-    raw_json_text = json.dumps(tool_blocks[0].input, sort_keys=True)
     usage = getattr(response, "usage", None)
-    usage_dict = None
-    if usage is not None:
-        usage_dict = {
+    usage_dict = (
+        {
             "input_tokens": getattr(usage, "input_tokens", None),
             "output_tokens": getattr(usage, "output_tokens", None),
         }
-    return raw_json_text, latency_ms, usage_dict
+        if usage is not None
+        else None
+    )
+    return json.dumps(tool_blocks[0].input, sort_keys=True), latency_ms, usage_dict
+
+
+def _call_openai(
+    system_prompt: str, user_prompt: str, judge_cfg: dict
+) -> Tuple[str, int, Optional[dict]]:
+    """OpenAI Chat Completions with structured output enforced via a
+    forced function tool call.
+
+    Function calling is used rather than `response_format`'s strict JSON
+    schema mode: the review payload keys the per-variant score maps by
+    variant *name*, which is data rather than schema, and strict mode
+    disallows the open-ended `additionalProperties` that requires.
+    """
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise LiveBackendUnavailable("the 'openai' package is not installed") from exc
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise LiveBackendUnavailable("OPENAI_API_KEY is not set")
+
+    client = OpenAI(api_key=api_key)
+    tool = {
+        "type": "function",
+        "function": {
+            "name": REVIEW_TOOL_SCHEMA["name"],
+            "description": REVIEW_TOOL_SCHEMA["description"],
+            "parameters": REVIEW_TOOL_SCHEMA["input_schema"],
+        },
+    }
+
+    start = time.monotonic()
+    try:
+        response = client.chat.completions.create(
+            model=judge_cfg["model"],
+            temperature=judge_cfg["temperature"],
+            max_tokens=judge_cfg["max_tokens"],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            tools=[tool],
+            tool_choice={"type": "function", "function": {"name": REVIEW_TOOL_SCHEMA["name"]}},
+        )
+    except Exception as exc:  # noqa: BLE001 -- any SDK/network/auth failure
+        raise LiveBackendError(str(exc)) from exc
+    latency_ms = int((time.monotonic() - start) * 1000)
+
+    tool_calls = response.choices[0].message.tool_calls or []
+    if not tool_calls:
+        raise LiveBackendError("model response did not include a tool call")
+
+    usage = getattr(response, "usage", None)
+    usage_dict = (
+        {
+            "input_tokens": getattr(usage, "prompt_tokens", None),
+            "output_tokens": getattr(usage, "completion_tokens", None),
+        }
+        if usage is not None
+        else None
+    )
+    # Already a JSON string; re-serialise so the cache key is stable
+    # regardless of the provider's key ordering.
+    try:
+        parsed = json.loads(tool_calls[0].function.arguments)
+    except json.JSONDecodeError as exc:
+        raise LiveBackendError("tool call arguments were not valid JSON: {}".format(exc)) from exc
+    return json.dumps(parsed, sort_keys=True), latency_ms, usage_dict
+
+
+# Provider dispatch. Adding a provider is one function plus one entry
+# here -- nothing else in the pipeline changes.
+_PROVIDERS = {
+    "anthropic": _call_anthropic,
+    "openai": _call_openai,
+}
+
+
+def call_live(system_prompt: str, user_prompt: str, config: dict) -> Tuple[str, int, Optional[dict]]:
+    """One real API call to the configured provider, with structured
+    output enforced by that provider's tool-calling mechanism. Returns
+    (raw_json_text, latency_ms, usage_dict).
+
+    Raises LiveBackendUnavailable when the call cannot even be attempted
+    (SDK not installed, no API key, unknown provider) so the caller can
+    fall through to the next backend without spending a retry. Raises
+    LiveBackendError when a call was attempted but failed or came back in
+    an unusable shape.
+    """
+    judge_cfg = config["judge"]
+    provider = judge_cfg.get("provider", "anthropic")
+    call = _PROVIDERS.get(provider)
+    if call is None:
+        raise LiveBackendUnavailable(
+            "unknown judge provider '{}' (expected one of: {})".format(
+                provider, ", ".join(sorted(_PROVIDERS))
+            )
+        )
+    return call(system_prompt, user_prompt, judge_cfg)
 
 
 def validate_reviews(
@@ -477,8 +580,13 @@ def run_judge_stage(
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         score_min=judge_cfg["score_min"], score_max=judge_cfg["score_max"]
     )
+    provider = judge_cfg.get("provider", "anthropic")
     prompt_hash = compute_prompt_hash(
-        judge_cfg["model"], judge_cfg["temperature"], judge_cfg["max_tokens"], system_prompt + prompt
+        provider,
+        judge_cfg["model"],
+        judge_cfg["temperature"],
+        judge_cfg["max_tokens"],
+        system_prompt + prompt,
     )
 
     log_path = config["paths"]["llm_calls"]
@@ -514,6 +622,7 @@ def run_judge_stage(
                     "timestamp": _now_iso(),
                     "backend": "cache",
                     "replayed_call_id": hit.get("call_id"),
+                    "provider": provider,
                     "model": judge_cfg["model"],
                     "prompt_hash": prompt_hash,
                     "parsed_ok": True,
@@ -537,6 +646,7 @@ def run_judge_stage(
                             "call_id": str(uuid.uuid4()),
                             "timestamp": _now_iso(),
                             "backend": "live",
+                            "provider": provider,
                             "model": judge_cfg["model"],
                             "prompt_hash": prompt_hash,
                             "parsed_ok": False,
@@ -551,6 +661,7 @@ def run_judge_stage(
                             "call_id": str(uuid.uuid4()),
                             "timestamp": _now_iso(),
                             "backend": "live",
+                            "provider": provider,
                             "model": judge_cfg["model"],
                             "prompt_hash": prompt_hash,
                             "parsed_ok": False,
@@ -567,6 +678,7 @@ def run_judge_stage(
                             "call_id": str(uuid.uuid4()),
                             "timestamp": _now_iso(),
                             "backend": "live",
+                            "provider": provider,
                             "model": judge_cfg["model"],
                             "prompt_hash": prompt_hash,
                             "response_raw": raw_json_text,
@@ -588,6 +700,7 @@ def run_judge_stage(
                             "call_id": str(uuid.uuid4()),
                             "timestamp": _now_iso(),
                             "backend": "live",
+                            "provider": provider,
                             "model": judge_cfg["model"],
                             "prompt_hash": prompt_hash,
                             "response_raw": raw_json_text,
@@ -605,6 +718,7 @@ def run_judge_stage(
                         "call_id": str(uuid.uuid4()),
                         "timestamp": _now_iso(),
                         "backend": "live",
+                        "provider": provider,
                         "model": judge_cfg["model"],
                         "prompt_hash": prompt_hash,
                         "response_raw": raw_json_text,

@@ -3,68 +3,68 @@
     "query_id": "Q1",
     "winner": "prompt_a",
     "faithfulness": {
-      "prompt_a": 4,
-      "prompt_b": 3
+      "prompt_a": 5,
+      "prompt_b": 2
     },
     "clarity": {
-      "prompt_a": 3,
-      "prompt_b": 3
+      "prompt_a": 5,
+      "prompt_b": 2
     },
     "overclaim_flags": {
       "prompt_a": false,
       "prompt_b": true
     },
-    "justification": "Stub judge (no live LLM backend available): winner derived from deterministic checks in priority order (must_not_claim_pass, must_include_pass, grounding_score; ties broken alphabetically). faithfulness is grounding_score rescaled to [1, 5]; clarity is a constant placeholder, not independently assessed; overclaim_flags reflect must_not_claim_pass and the unsupported_numeric risk flag."
+    "justification": "Variant 'prompt_a' accurately reflects the evidence that most withdrawal reviews complete within 24 hours, while some may take longer. In contrast, 'prompt_b' incorrectly claims that withdrawals are guaranteed to clear within 24 hours."
   },
   {
     "query_id": "Q2",
     "winner": "prompt_a",
     "faithfulness": {
-      "prompt_a": 4,
-      "prompt_b": 2
+      "prompt_a": 5,
+      "prompt_b": 1
     },
     "clarity": {
-      "prompt_a": 3,
-      "prompt_b": 3
+      "prompt_a": 5,
+      "prompt_b": 2
     },
     "overclaim_flags": {
       "prompt_a": false,
       "prompt_b": true
     },
-    "justification": "Stub judge (no live LLM backend available): winner derived from deterministic checks in priority order (must_not_claim_pass, must_include_pass, grounding_score; ties broken alphabetically). faithfulness is grounding_score rescaled to [1, 5]; clarity is a constant placeholder, not independently assessed; overclaim_flags reflect must_not_claim_pass and the unsupported_numeric risk flag."
+    "justification": "Variant 'prompt_a' correctly states that support cannot view existing passwords and suggests using the password reset option, which aligns with the evidence. 'prompt_b' incorrectly claims that support can send the current password, which is not supported by the evidence."
   },
   {
     "query_id": "Q3",
     "winner": "prompt_a",
     "faithfulness": {
       "prompt_a": 5,
-      "prompt_b": 2
+      "prompt_b": 1
     },
     "clarity": {
-      "prompt_a": 3,
-      "prompt_b": 3
+      "prompt_a": 5,
+      "prompt_b": 2
     },
     "overclaim_flags": {
       "prompt_a": false,
       "prompt_b": true
     },
-    "justification": "Stub judge (no live LLM backend available): winner derived from deterministic checks in priority order (must_not_claim_pass, must_include_pass, grounding_score; ties broken alphabetically). faithfulness is grounding_score rescaled to [1, 5]; clarity is a constant placeholder, not independently assessed; overclaim_flags reflect must_not_claim_pass and the unsupported_numeric risk flag."
+    "justification": "Variant 'prompt_a' correctly states that a screenshot is not accepted as proof of address and provides acceptable alternatives, which is supported by the evidence. 'prompt_b' contradicts the evidence by suggesting that a screenshot would be acceptable."
   },
   {
     "query_id": "Q4",
     "winner": "prompt_a",
     "faithfulness": {
       "prompt_a": 5,
-      "prompt_b": 2
+      "prompt_b": 1
     },
     "clarity": {
-      "prompt_a": 3,
-      "prompt_b": 3
+      "prompt_a": 5,
+      "prompt_b": 2
     },
     "overclaim_flags": {
       "prompt_a": false,
-      "prompt_b": false
+      "prompt_b": true
     },
-    "justification": "Stub judge (no live LLM backend available): winner derived from deterministic checks in priority order (must_not_claim_pass, must_include_pass, grounding_score; ties broken alphabetically). faithfulness is grounding_score rescaled to [1, 5]; clarity is a constant placeholder, not independently assessed; overclaim_flags reflect must_not_claim_pass and the unsupported_numeric risk flag."
+    "justification": "Variant 'prompt_a' accurately reflects the evidence that demo accounts do not support real withdrawals, providing a clear and correct answer. 'prompt_b' introduces uncertainty by suggesting that withdrawals may be possible after upgrading, which is not supported by the evidence."
   }
 ]

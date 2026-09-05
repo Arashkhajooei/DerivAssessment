@@ -46,6 +46,7 @@ def build_run_manifest(
         "input_hashes": {name: sha256_file(path) for name, path in input_paths.items()},
         "python_version": platform.python_version(),
         "judge": {
+            "provider": config["judge"].get("provider"),
             "model": config["judge"]["model"],
             "backend_order": config["judge"]["backend_order"],
             "backend_used": judge_backend,

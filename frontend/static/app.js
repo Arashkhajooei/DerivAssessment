@@ -103,6 +103,21 @@ function emptyState(message) {
   return `<div class="empty-state"><strong>No results yet</strong>${esc(message)}</div>`;
 }
 
+
+/* Which judge backend actually served the current results? A stub run
+   must never be mistaken for a real model judgment, so this is shown
+   next to the verdict itself, not buried in the logs tab. */
+function judgeBackendBadge() {
+  const used = state.manifest && state.manifest.judge && state.manifest.judge.backend_used;
+  const cfg = state.judge_config || {};
+  const model = (state.manifest && state.manifest.judge && state.manifest.judge.model) || cfg.model;
+  const provider = (state.manifest && state.manifest.judge && state.manifest.judge.provider) || cfg.provider;
+  if (!used) return '<span class="badge badge-neutral">unknown</span>';
+  const cls = used === "stub" ? "badge-warn" : "badge-pass";
+  const detail = used === "stub" ? "rule-derived, not judged" : `${esc(provider)}/${esc(model)}`;
+  return `<span class="badge ${cls}">${esc(used)}</span> <span class="hint">${detail}</span>`;
+}
+
 /* ---------- tab: overview ---------- */
 
 function renderOverview() {
@@ -128,6 +143,10 @@ function renderOverview() {
       </div>
       ${rec.margin !== null && rec.margin !== undefined
         ? `<div><div class="verdict-label">Composite margin</div><div class="mono">${esc(rec.margin)}</div></div>` : ""}
+      <div>
+        <div class="verdict-label">Judge</div>
+        <div>${judgeBackendBadge()}</div>
+      </div>
     </div>
 
     <div class="card">
