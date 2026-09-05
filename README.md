@@ -66,8 +66,16 @@ from a tester's perspective, rather than reading eight files by hand.
 
 ```bash
 uv pip install --python .venv/bin/python -r requirements-frontend.txt
-.venv/bin/python frontend/server.py       # http://127.0.0.1:5050
+
+# from the repository root:
+.venv/bin/uvicorn frontend.server:app --host 127.0.0.1 --port 5050
 ```
+
+Then open <http://127.0.0.1:5050>. Add `--reload` while editing the
+frontend if you want auto-restart on file changes. `python
+frontend/server.py` also works and is equivalent — it just calls
+`uvicorn.run()` with the same settings. Interactive API docs are at
+`/api/docs`.
 
 It gives you five views and three buttons:
 
@@ -149,11 +157,11 @@ validate.py                   checks a completed run's artifacts for
 
 frontend/                    optional local dashboard (see above) --
                               not part of the graded harness
-  server.py                   FastAPI app: serves the UI, exposes the
-                              artifacts as JSON, runs run.py/validate.py/
-                              pytest as subprocesses, handles fixture
-                              upload (validated before it overwrites) and
-                              restore
+  server.py                   FastAPI app (served by uvicorn): serves the
+                              UI, exposes the artifacts as JSON, runs
+                              run.py/validate.py/pytest as subprocesses,
+                              handles fixture upload (validated before it
+                              overwrites) and restore
   static/index.html            page skeleton
   static/app.js                rendering + fetch logic (no framework)
   static/styles.css            hand-written CSS (no CDN, works offline)

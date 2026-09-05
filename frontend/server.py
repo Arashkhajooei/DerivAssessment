@@ -23,7 +23,9 @@ validate.py, pytest) on request, so it binds to loopback only and runs
 without auto-reload. It is a developer tool, not something to expose
 beyond localhost.
 
-Run it with:  .venv/bin/python frontend/server.py
+Run it from the repository root with:
+    .venv/bin/uvicorn frontend.server:app --host 127.0.0.1 --port 5050
+(or, equivalently, `.venv/bin/python frontend/server.py`)
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ import re
 import shutil
 import subprocess
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -64,9 +67,6 @@ FIXTURE_FILES = ("kb.json", "queries.json", "candidate_answers.json")
 # upload from being buffered into memory.
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
-app = FastAPI(title="Evaluation Harness Dashboard", docs_url="/api/docs")
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
 
 def _ensure_backup() -> None:
     """Snapshot the original sample fixture on first start, so a tester
@@ -79,6 +79,23 @@ def _ensure_backup() -> None:
         source = ROOT / name
         if not backup_path.exists() and source.exists():
             shutil.copyfile(source, backup_path)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Runs on startup regardless of how the app was launched -- the
+    uvicorn CLI (`uvicorn frontend.server:app`) never executes the
+    __main__ block below, so the fixture snapshot has to happen here.
+    """
+    _ensure_backup()
+    print("Evaluation harness dashboard ready — open http://127.0.0.1:5050")
+    yield
+
+
+app = FastAPI(
+    title="Evaluation Harness Dashboard", docs_url="/api/docs", lifespan=lifespan
+)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 def _read_json(path: Path):
@@ -337,8 +354,9 @@ def api_restore_sample() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
+    # Convenience entrypoint so `python frontend/server.py` works too.
+    # The canonical way to launch is the uvicorn CLI, from the repo root:
+    #     uvicorn frontend.server:app --host 127.0.0.1 --port 5050
     import uvicorn
 
-    _ensure_backup()
-    print("Evaluation harness dashboard: http://127.0.0.1:5050  (Ctrl+C to stop)")
     uvicorn.run(app, host="127.0.0.1", port=5050, log_level="info")

@@ -3,8 +3,12 @@
   "configurations": [
     {
       "name": "eval-dashboard",
-      "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["frontend/server.py"],
+      "runtimeExecutable": ".venv/bin/uvicorn",
+      "runtimeArgs": [
+        "frontend.server:app",
+        "--host", "127.0.0.1",
+        "--port", "5050"
+      ],
       "port": 5050
     }
   ]
