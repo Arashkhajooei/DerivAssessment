@@ -1,0 +1,55 @@
+[
+  {
+    "query_id": "Q1",
+    "variant": "prompt_a",
+    "tags": []
+  },
+  {
+    "query_id": "Q1",
+    "variant": "prompt_b",
+    "tags": [
+      "unsupported_claim",
+      "overconfident_tone"
+    ]
+  },
+  {
+    "query_id": "Q2",
+    "variant": "prompt_a",
+    "tags": []
+  },
+  {
+    "query_id": "Q2",
+    "variant": "prompt_b",
+    "tags": [
+      "unsupported_claim",
+      "missed_key_fact",
+      "policy_violation"
+    ]
+  },
+  {
+    "query_id": "Q3",
+    "variant": "prompt_a",
+    "tags": []
+  },
+  {
+    "query_id": "Q3",
+    "variant": "prompt_b",
+    "tags": [
+      "unsupported_claim",
+      "missed_key_fact",
+      "policy_violation"
+    ]
+  },
+  {
+    "query_id": "Q4",
+    "variant": "prompt_a",
+    "tags": []
+  },
+  {
+    "query_id": "Q4",
+    "variant": "prompt_b",
+    "tags": [
+      "missed_key_fact"
+    ]
+  }
+]

@@ -1,0 +1,103 @@
+[
+  {
+    "query_id": "Q1",
+    "variant": "prompt_a",
+    "retrieval_hit": true,
+    "must_include_pass": true,
+    "must_not_claim_pass": true,
+    "grounding_score": 0.75,
+    "risk_flags": [
+      "none"
+    ],
+    "notes": "must_include: matched '24 hours' (via exact), 'security checks' (via exact); must_not_claim: clean; grounding: precision=0.7059, quote_span=True, unsupported_numbers=none"
+  },
+  {
+    "query_id": "Q1",
+    "variant": "prompt_b",
+    "retrieval_hit": true,
+    "must_include_pass": true,
+    "must_not_claim_pass": false,
+    "grounding_score": 0.51,
+    "risk_flags": [
+      "must_not_claim_violation"
+    ],
+    "notes": "must_include: matched '24 hours' (via exact); must_not_claim: VIOLATED 'guaranteed' (via exact), 'instant' (via exact); grounding: precision=0.6, quote_span=False, unsupported_numbers=none"
+  },
+  {
+    "query_id": "Q2",
+    "variant": "prompt_a",
+    "retrieval_hit": true,
+    "must_include_pass": true,
+    "must_not_claim_pass": true,
+    "grounding_score": 0.6679,
+    "risk_flags": [
+      "none"
+    ],
+    "notes": "must_include: matched 'cannot manually view' (via exact); must_not_claim: clean; grounding: precision=0.7857, quote_span=False, unsupported_numbers=none"
+  },
+  {
+    "query_id": "Q2",
+    "variant": "prompt_b",
+    "retrieval_hit": true,
+    "must_include_pass": false,
+    "must_not_claim_pass": false,
+    "grounding_score": 0.2833,
+    "risk_flags": [
+      "missing_required_phrase",
+      "must_not_claim_violation",
+      "low_grounding"
+    ],
+    "notes": "must_include: no match; must_not_claim: VIOLATED 'send you your password' (via subsequence); grounding: precision=0.3333, quote_span=False, unsupported_numbers=none"
+  },
+  {
+    "query_id": "Q3",
+    "variant": "prompt_a",
+    "retrieval_hit": true,
+    "must_include_pass": true,
+    "must_not_claim_pass": true,
+    "grounding_score": 0.8867,
+    "risk_flags": [
+      "none"
+    ],
+    "notes": "must_include: matched 'bank statements' (via stemmed_subsequence); must_not_claim: clean; grounding: precision=0.8667, quote_span=True, unsupported_numbers=none"
+  },
+  {
+    "query_id": "Q3",
+    "variant": "prompt_b",
+    "retrieval_hit": true,
+    "must_include_pass": false,
+    "must_not_claim_pass": false,
+    "grounding_score": 0.2833,
+    "risk_flags": [
+      "missing_required_phrase",
+      "must_not_claim_violation",
+      "low_grounding"
+    ],
+    "notes": "must_include: no match; must_not_claim: VIOLATED 'screenshot is fine' (via stemmed_subsequence); grounding: precision=0.3333, quote_span=False, unsupported_numbers=none"
+  },
+  {
+    "query_id": "Q4",
+    "variant": "prompt_a",
+    "retrieval_hit": true,
+    "must_include_pass": true,
+    "must_not_claim_pass": true,
+    "grounding_score": 0.9227,
+    "risk_flags": [
+      "none"
+    ],
+    "notes": "must_include: matched 'virtual funds' (via exact), 'do not support real deposits or withdrawals' (via exact); must_not_claim: clean; grounding: precision=0.9091, quote_span=True, unsupported_numbers=none"
+  },
+  {
+    "query_id": "Q4",
+    "variant": "prompt_b",
+    "retrieval_hit": true,
+    "must_include_pass": false,
+    "must_not_claim_pass": true,
+    "grounding_score": 0.2429,
+    "risk_flags": [
+      "missing_required_phrase",
+      "low_grounding"
+    ],
+    "notes": "must_include: no match; must_not_claim: clean; grounding: precision=0.2857, quote_span=False, unsupported_numbers=none"
+  }
+]

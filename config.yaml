@@ -46,6 +46,9 @@ grounding:
   # Penalty applied when a number or date in the answer appears nowhere
   # in the retrieved evidence -- a cheap, high-signal hallucination check.
   numeric_penalty: 0.25
+  # Below this, a risk_flag is raised even if no single check failed --
+  # a broad hint that the answer may be drifting from its evidence.
+  low_grounding_threshold: 0.3
   score_precision: 4
 
 risk:
