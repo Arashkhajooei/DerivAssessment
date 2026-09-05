@@ -1,0 +1,8 @@
+# Optional: only needed for the local dashboard (frontend/server.py).
+# The harness itself -- run.py, validate.py, the test suite -- does not
+# depend on any of this.
+-r requirements.txt
+fastapi==0.115.6
+uvicorn==0.34.0
+# Required by FastAPI to parse multipart/form-data (the fixture upload).
+python-multipart==0.0.20

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evaluation Harness Dashboard</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <h1>Evaluation Harness</h1>
+    <span class="subtitle">RAG prompt strategy evaluator</span>
+  </div>
+  <div class="topbar-right">
+    <span id="fixture-badge" class="badge badge-neutral">loading…</span>
+    <button id="btn-run"      class="btn btn-primary">Run Pipeline</button>
+    <button id="btn-validate" class="btn">Validate</button>
+    <button id="btn-test"     class="btn">Run Tests</button>
+  </div>
+</header>
+
+<div id="banner" class="banner hidden"></div>
+
+<section id="console-panel" class="console-panel hidden">
+  <div class="console-head">
+    <span id="console-title">Console</span>
+    <div>
+      <span id="console-status" class="badge"></span>
+      <button id="console-close" class="btn btn-small">hide</button>
+    </div>
+  </div>
+  <pre id="console-body"></pre>
+</section>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="queries">Per-Query</button>
+  <button class="tab" data-tab="variants">Variants</button>
+  <button class="tab" data-tab="logs">Logs &amp; Provenance</button>
+  <button class="tab" data-tab="fixture">Fixture</button>
+</nav>
+
+<main>
+  <section id="tab-overview" class="tab-panel"></section>
+  <section id="tab-queries"  class="tab-panel hidden"></section>
+  <section id="tab-variants" class="tab-panel hidden"></section>
+  <section id="tab-logs"     class="tab-panel hidden"></section>
+  <section id="tab-fixture"  class="tab-panel hidden"></section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

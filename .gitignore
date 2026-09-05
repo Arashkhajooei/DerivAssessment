@@ -12,3 +12,7 @@ venv/
 
 # Secrets — never commit API keys
 .env
+
+# Dashboard runtime state (regenerated on first launch)
+frontend/sample_backup/
+frontend/_upload_tmp/

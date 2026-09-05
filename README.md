@@ -16,6 +16,7 @@ recommendation, the explainability view, the run manifest, the
 ## Contents
 
 - [Quickstart](#quickstart)
+- [Dashboard (optional UI)](#dashboard-optional-ui)
 - [Repository layout](#repository-layout)
 - [Artifacts reference](#artifacts-reference) — what's in each generated file
 - [How the recommendation is computed](#how-the-recommendation-is-computed) — the aggregation rule, plain English
@@ -57,6 +58,49 @@ interpreter); it has been developed and tested on 3.12.
 artifacts are present, well-formed, internally consistent, and that
 `recommendation.md` is reproducible from the stored artifacts alone —
 see "Validation" below for exactly what it checks.
+
+## Dashboard (optional UI)
+
+A local web dashboard for inspecting every stage and testing the harness
+from a tester's perspective, rather than reading eight files by hand.
+
+```bash
+uv pip install --python .venv/bin/python -r requirements-frontend.txt
+.venv/bin/python frontend/server.py       # http://127.0.0.1:5050
+```
+
+It gives you five views and three buttons:
+
+| View | Shows |
+|---|---|
+| **Overview** | The promotion verdict, the reasons behind it, any tradeoffs, and the raw `recommendation.md` / `review_report.md` |
+| **Per-Query** | Per question: retrieved evidence with BM25 scores (expected docs badged), every variant's answer, pass/fail on each rule check, failure tags, and the judge's verdict + justification |
+| **Variants** | The comparison table — composite score, judge faithfulness/clarity, judge wins, failure-tag counts, with disqualified variants flagged in red |
+| **Logs & Provenance** | Every LLM call *attempt* (including failed ones) with backend, prompt hash, and errors; plus the full run manifest |
+| **Fixture** | Current inputs, a fixture upload form, and a restore-original button |
+
+**Run Pipeline** / **Validate** / **Run Tests** execute `run.py`,
+`validate.py`, and `pytest` as subprocesses and stream the output into a
+console panel with the exit code — so a tester never needs a terminal.
+
+**Fixture swap from the browser.** Upload a replacement `kb.json` /
+`queries.json` / `candidate_answers.json` and the dashboard runs them
+through the harness's own `load_inputs` *before* overwriting anything.
+A fixture that fails schema or referential-integrity checks is rejected
+with the exact errors the pipeline would print, and the working fixture
+is left untouched. This was verified against a fixture with entirely
+different document ids (`KB-A`/`KB-B`), different query ids
+(`TICKET-77`/`TICKET-91`), and **three** variants
+(`baseline`/`concise_v2`/`risky_v3`): the pipeline correctly disqualified
+`risky_v3` for a banned claim on the high-risk query and promoted
+`baseline` on composite score — with no code changes.
+
+The dashboard is **not part of the graded harness**. Its dependencies
+live in `requirements-frontend.txt`; `run.py`, `validate.py`, and the
+test suite need none of them and behave identically whether or not it is
+ever started. It binds to loopback only and runs without auto-reload,
+because it executes local subprocesses on request — it is a developer
+tool, not something to expose beyond localhost.
 
 ## Repository layout
 
@@ -102,6 +146,17 @@ run.py                       orchestrates the full pipeline end to end
 validate.py                   checks a completed run's artifacts for
                               presence, well-formedness, internal
                               consistency, and recommendation reproducibility
+
+frontend/                    optional local dashboard (see above) --
+                              not part of the graded harness
+  server.py                   FastAPI app: serves the UI, exposes the
+                              artifacts as JSON, runs run.py/validate.py/
+                              pytest as subprocesses, handles fixture
+                              upload (validated before it overwrites) and
+                              restore
+  static/index.html            page skeleton
+  static/app.js                rendering + fetch logic (no framework)
+  static/styles.css            hand-written CSS (no CDN, works offline)
 
 tests/
   test_loader.py              validation behaviour, incl. adversarial fixtures
