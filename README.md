@@ -7,11 +7,25 @@ code-based checks and one controlled LLM judgment stage, detects safety and
 grounding failures, and produces a promotion recommendation with stated
 reasoning — not just a leaderboard.
 
-> **Three documents, three jobs.** [TASK.md](TASK.md) is the brief, reproduced
-> in full with a requirement-by-requirement coverage map. This README covers
-> setup and artifacts. [HANDBOOK.md](HANDBOOK.md) is the complete
-> walkthrough — every design decision, with worked examples and the reasoning
-> behind each. PDF versions of all three are in the repository root.
+## Documentation
+
+**Three documents, three jobs.** Each is available as Markdown and as a PDF
+rendered in the same black-and-white theme as the presentation deck.
+
+| Document | What it covers | PDF |
+|---|---|---|
+| [TASK.md](TASK.md) | The assessment brief reproduced in full, with a requirement-by-requirement coverage map | [TASK.pdf](TASK.pdf) |
+| **README.md** — this file | Setup, quickstart, artifacts, and how to run the harness and dashboard | [README.pdf](README.pdf) |
+| [HANDBOOK.md](HANDBOOK.md) | The complete technical walkthrough: every pipeline stage, every design decision with its cost, worked examples throughout (~13,000 words) | [HANDBOOK.pdf](HANDBOOK.pdf) |
+
+Start with **TASK.md** for what was asked, this README for how to run it, and
+**HANDBOOK.md** for why it is built this way.
+
+Regenerate any PDF after editing its Markdown source:
+
+```bash
+python tools/make_pdf.py HANDBOOK.md
+```
 
 **Status: complete.** All ten build steps are implemented: deterministic
 retrieval, rule-based scoring, the one controlled LLM review stage
@@ -21,6 +35,7 @@ recommendation, the explainability view, the run manifest, the
 
 ## Contents
 
+- [Documentation](#documentation) — this repo's three documents, in Markdown and PDF
 - [Quickstart](#quickstart)
 - [Dashboard (optional UI)](#dashboard-optional-ui)
 - [Running with Docker](#running-with-docker)
