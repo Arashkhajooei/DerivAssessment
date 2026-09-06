@@ -7,9 +7,11 @@ code-based checks and one controlled LLM judgment stage, detects safety and
 grounding failures, and produces a promotion recommendation with stated
 reasoning — not just a leaderboard.
 
-> **The original task brief, reproduced in full with a requirement-by-requirement
-> coverage map, is in [TASK.md](TASK.md).** This README documents what was
-> built; TASK.md is the specification it was built against.
+> **Three documents, three jobs.** [TASK.md](TASK.md) is the brief, reproduced
+> in full with a requirement-by-requirement coverage map. This README covers
+> setup and artifacts. [HANDBOOK.md](HANDBOOK.md) is the complete
+> walkthrough — every design decision, with worked examples and the reasoning
+> behind each. PDF versions of all three are in the repository root.
 
 **Status: complete.** All ten build steps are implemented: deterministic
 retrieval, rule-based scoring, the one controlled LLM review stage

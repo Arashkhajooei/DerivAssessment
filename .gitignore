@@ -13,6 +13,11 @@ venv/
 # Secrets — never commit API keys
 .env
 
-# Dashboard runtime state (regenerated on first launch)
+# Presentation build artifacts
+presentation/node_modules/
+presentation/slide-*.jpg
+presentation/*.pdf
+presentation/sample_backup/
+presentation/_upload_tmp/
 frontend/sample_backup/
 frontend/_upload_tmp/
